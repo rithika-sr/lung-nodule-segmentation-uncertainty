@@ -2,6 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **Medical image segmentation system for lung nodule detection with Monte Carlo Dropout uncertainty quantification to assist radiologists in clinical decision-making.**
 
@@ -78,21 +79,17 @@ Output (64³) + Uncertainty Map
 
 ### Uncertainty Quantification in Action
 
-![Uncertainty Visualization](results/plots/uncertainty_sample_0.png)
+<img width="4469" height="2924" alt="image" src="https://github.com/user-attachments/assets/1e7ea8f2-875c-4c4d-bef2-480a268ed5ab" />
+
 
 *Example showing: (Top) Input CT, Ground Truth, Prediction | (Bottom) Uncertainty heatmap, Overlay, High-uncertainty regions marked in red*
 
 ### Training Progress
 
-![Training History](results/plots/training_history.png)
+<img width="4468" height="1466" alt="image" src="https://github.com/user-attachments/assets/7a115d7e-743d-4947-991f-67f61d0e5202" />
 
 *Loss decreased from 0.75 → 0.47 over 20 epochs*
 
-### Uncertainty Analysis
-
-![Uncertainty Statistics](results/plots/uncertainty_statistics.png)
-
-*Model shows higher uncertainty on incorrect predictions - perfect for clinical flagging!*
 
 ---
 
@@ -149,23 +146,146 @@ python evaluate.py --n_mc_samples 20 --num_visualizations 5
 ```
 lung-nodule-segmentation-uncertainty/
 ├── data/
-│   ├── raw/              # LUNA16 dataset
-│   └── processed/        # Preprocessed 3D patches
+│   ├── raw/                    # LUNA16 dataset
+│   │   ├── annotations.csv     # Nodule coordinates and diameters
+│   │   ├── candidates.csv      # Candidate locations (true + false positives)
+│   │   └── seg-lungs-LUNA16/   # CT scan files (.mhd + .zraw)
+│   └── processed/              # Preprocessed 3D patches
+│       ├── positive_patches.npy      # Nodule patches (103 samples)
+│       ├── positive_masks.npy        # Ground truth segmentation masks
+│       ├── negative_patches.npy      # Background patches (206 samples)
+│       ├── positive_labels.npy       # Binary labels for positives
+│       ├── negative_labels.npy       # Binary labels for negatives
+│       └── metadata.pkl              # Dataset metadata
 ├── notebooks/
-│   └── 01_EDA.ipynb      # Exploratory data analysis
+│   └── 01_EDA.ipynb            # Exploratory data analysis
+│       ├── Dataset statistics and visualizations
+│       ├── Class imbalance analysis (99.75% false positives)
+│       ├── Nodule size distribution (3-32mm)
+│       └── CT scan visualization (axial, coronal, sagittal views)
 ├── src/
-│   ├── data_preprocessing.py   # Extract patches from CT scans
-│   ├── models.py               # 3D U-Net architecture
-│   ├── dataset.py              # PyTorch data loaders
-│   ├── utils.py                # Training utilities
-│   ├── uncertainty.py          # Monte Carlo Dropout
-│   ├── train.py                # Training pipeline
-│   └── evaluate.py             # Evaluation with uncertainty
+│   ├── __init__.py                   # Package initialization
+│   ├── data_preprocessing.py         # Data preprocessing pipeline
+│   │   ├── LUNA16Preprocessor class
+│   │   ├── Load CT scans (SimpleITK)
+│   │   ├── Extract 3D patches (64×64×64)
+│   │   ├── World-to-voxel coordinate conversion
+│   │   ├── Generate spherical masks from diameters
+│   │   └── Create balanced positive/negative samples
+│   ├── models.py                     # 3D U-Net architecture
+│   │   ├── UNet3D: Main model class (5.6M parameters)
+│   │   ├── DoubleConv: Convolution block with dropout
+│   │   ├── Down: Downsampling block (encoder)
+│   │   ├── Up: Upsampling block with skip connections (decoder)
+│   │   └── enable_dropout(): For Monte Carlo inference
+│   ├── dataset.py                    # PyTorch Dataset and DataLoaders
+│   │   ├── LUNA16Dataset: Custom dataset class
+│   │   ├── Train/val/test split (70/15/15)
+│   │   ├── Data augmentation ready
+│   │   └── get_dataloaders(): Factory function
+│   ├── utils.py                      # Training utilities
+│   │   ├── DiceLoss: Segmentation loss
+│   │   ├── CombinedLoss: Dice + BCE
+│   │   ├── dice_coefficient(): Evaluation metric
+│   │   ├── iou_score(): IoU metric
+│   │   ├── save_checkpoint(): Model checkpointing
+│   │   ├── load_checkpoint(): Resume training
+│   │   ├── visualize_prediction(): Single sample viz
+│   │   └── plot_training_history(): Training curves
+│   ├── uncertainty.py                # Monte Carlo Dropout implementation
+│   │   ├── MonteCarloDropout: MC sampling class
+│   │   ├── predict_with_uncertainty(): Get mean + variance
+│   │   ├── evaluate_uncertainty(): Batch evaluation
+│   │   ├── visualize_uncertainty(): Uncertainty heatmaps
+│   │   ├── analyze_uncertainty_statistics(): Calibration metrics
+│   │   └── plot_uncertainty_statistics(): Uncertainty analysis plots
+│   ├── train.py                      # Training pipeline
+│   │   ├── Trainer class with training/validation loops
+│   │   ├── TensorBoard logging
+│   │   ├── Automatic checkpointing
+│   │   ├── Early stopping ready
+│   │   └── Command-line arguments support
+│   └── evaluate.py                   # Evaluation with uncertainty
+│       ├── Load trained model
+│       ├── Monte Carlo inference (20 samples)
+│       ├── Calculate Dice, IoU metrics
+│       ├── Uncertainty calibration analysis
+│       └── Generate visualization suite
 ├── results/
-│   ├── models/           # Saved checkpoints
-│   ├── plots/            # Visualizations
-│   └── logs/             # TensorBoard logs
-└── README.md
+│   ├── models/                 # Saved model checkpoints
+│   │   ├── best_model.pth            # Best validation model
+│   │   ├── checkpoint_epoch_5.pth    # Periodic checkpoints
+│   │   ├── checkpoint_epoch_10.pth
+│   │   ├── checkpoint_epoch_15.pth
+│   │   └── checkpoint_epoch_20.pth
+│   ├── plots/                  # Visualizations
+│   │   ├── training_history.png      # Loss and Dice curves
+│   │   ├── uncertainty_statistics.png # Calibration analysis
+│   │   ├── uncertainty_sample_0.png   # Example predictions
+│   │   ├── uncertainty_sample_11.png
+│   │   ├── uncertainty_sample_23.png
+│   │   ├── uncertainty_sample_34.png
+│   │   └── uncertainty_sample_46.png
+│   └── logs/                   # TensorBoard logs
+│       └── events.out.tfevents.*
+├── requirements.txt            # Python dependencies
+├── .gitignore                  # Git ignore rules
+└── README.md                   # This file
+```
+
+---
+
+## 🛠️ Code Modules
+
+### Core Pipeline
+
+| Module | Purpose | Key Functions |
+|--------|---------|---------------|
+| `data_preprocessing.py` | Extract patches from CT scans | `LUNA16Preprocessor`, `process_dataset()` |
+| `models.py` | 3D U-Net architecture | `UNet3D`, `get_model()`, `enable_dropout()` |
+| `dataset.py` | PyTorch data handling | `LUNA16Dataset`, `get_dataloaders()` |
+| `utils.py` | Training utilities | `CombinedLoss`, `dice_coefficient()`, `save_checkpoint()` |
+| `uncertainty.py` | Monte Carlo Dropout | `MonteCarloDropout`, `predict_with_uncertainty()` |
+| `train.py` | Model training | `Trainer` class, training loop, logging |
+| `evaluate.py` | Model evaluation | Uncertainty evaluation, metrics, visualization |
+
+### Usage Examples
+
+**Preprocess Data:**
+```python
+from data_preprocessing import LUNA16Preprocessor
+
+preprocessor = LUNA16Preprocessor(
+    raw_data_dir='data/raw/',
+    processed_data_dir='data/processed/',
+    patch_size=64
+)
+preprocessor.process_dataset(max_samples=100, negative_ratio=2)
+```
+
+**Train Model:**
+```python
+from models import get_model
+from dataset import get_dataloaders
+from utils import CombinedLoss
+
+model = get_model(in_channels=1, out_channels=1, dropout_rate=0.2)
+train_loader, val_loader, _ = get_dataloaders(batch_size=2)
+criterion = CombinedLoss()
+
+# See train.py for complete training loop
+```
+
+**Uncertainty Quantification:**
+```python
+from uncertainty import MonteCarloDropout
+
+mc_dropout = MonteCarloDropout(model, device, n_samples=20)
+mean_pred, uncertainty = mc_dropout.predict_with_uncertainty(input_patch)
+
+# High uncertainty → flag for review
+if uncertainty.mean() > threshold:
+    print("⚠️ Uncertain prediction - requires expert review")
 ```
 
 ---
@@ -206,7 +326,7 @@ else:
 - Extract 64×64×64 voxel patches centered on nodules
 - Generate spherical masks based on nodule diameter
 - Create negative samples from random locations
-- 70/15/15 train/validation/test split
+- 70/15/15 train/validation/test split (216/46/47 samples)
 
 ---
 
@@ -219,6 +339,7 @@ else:
 ✅ **Uncertainty Quantification**: Monte Carlo Dropout for epistemic uncertainty  
 ✅ **Model Evaluation**: Dice coefficient, IoU, uncertainty calibration  
 ✅ **Production Pipeline**: End-to-end from preprocessing to deployment  
+✅ **Software Engineering**: Modular code, Git workflow, documentation
 
 ### Clinical AI Considerations
 
@@ -226,6 +347,7 @@ else:
 - **Human-in-the-Loop**: Model assists rather than replaces radiologists
 - **Interpretability**: Uncertainty maps show where model is uncertain
 - **Validation**: Performance measured on held-out test set
+- **Real-World Imbalance**: Handles 99.75% false positive rate
 
 ---
 
@@ -237,6 +359,8 @@ else:
 - [ ] **3D Visualization**: Interactive volume rendering
 - [ ] **Deployment**: Web app with Gradio/Streamlit interface
 - [ ] **Full LUNA16**: Scale to complete 888-scan dataset
+- [ ] **Model Improvements**: Attention mechanisms, residual connections
+- [ ] **Data Augmentation**: Rotations, flips, elastic deformations
 
 ---
 
@@ -246,22 +370,11 @@ else:
 - **MC Dropout**: [Gal & Ghahramani, 2016](https://arxiv.org/abs/1506.02142)
 - **LUNA16**: [Setio et al., 2017](https://arxiv.org/abs/1612.08012)
 
-
 ---
 
-## 🙏 Acknowledgments
+
+## 📄 Acknowledgments
 
 - LUNA16 dataset providers and the medical imaging community
 - Anthropic's Claude for development assistance
 - PyTorch and medical imaging open-source libraries
-
----
-
-
-<div align="center">
-  
-**⭐ Star this repository if you found it helpful!**
-
-
-
-</div>
